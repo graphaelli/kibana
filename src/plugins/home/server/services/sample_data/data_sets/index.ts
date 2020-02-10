@@ -20,3 +20,4 @@
 export { flightsSpecProvider } from './flights';
 export { logsSpecProvider } from './logs';
 export { ecommerceSpecProvider } from './ecommerce';
+export { observabilitySpecProvider } from './observability';
