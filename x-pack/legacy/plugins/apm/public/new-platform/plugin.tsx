@@ -99,6 +99,8 @@ export class ApmPlugin
   public setup(_core: CoreSetup, plugins: ApmPluginSetupDeps) {
     plugins.home.featureCatalogue.register(featureCatalogueEntry);
     this.setupPlugins = plugins;
+
+    // TODO: addLinksToSampleDatasets
   }
 
   public start(core: CoreStart) {
