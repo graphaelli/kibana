@@ -152,25 +152,27 @@ export function createInstallRoute(
       }
 
       let createResults;
-      try {
-        createResults = await context.core.savedObjects.client.bulkCreate(
-          sampleDataset.savedObjects,
-          { overwrite: true }
-        );
-      } catch (err) {
-        const errMsg = `bulkCreate failed, error: ${err.message}`;
-        logger.warn(errMsg);
-        return res.internalError({ body: errMsg });
-      }
-      const errors = createResults.saved_objects.filter(savedObjectCreateResult => {
-        return Boolean(savedObjectCreateResult.error);
-      });
-      if (errors.length > 0) {
-        const errMsg = `sample_data install errors while loading saved objects. Errors: ${errors.join(
-          ','
-        )}`;
-        logger.warn(errMsg);
-        return res.customError({ body: errMsg, statusCode: 403 });
+      if (sampleDataset.savedObjects.length > 0) {
+        try {
+          createResults = await context.core.savedObjects.client.bulkCreate(
+            sampleDataset.savedObjects,
+            { overwrite: true }
+          );
+        } catch (err) {
+          const errMsg = `bulkCreate failed, error: ${err.message}`;
+          logger.warn(errMsg);
+          return res.internalError({ body: errMsg });
+        }
+        const errors = createResults.saved_objects.filter(savedObjectCreateResult => {
+          return Boolean(savedObjectCreateResult.error);
+        });
+        if (errors.length > 0) {
+          const errMsg = `sample_data install errors while loading saved objects. Errors: ${errors.join(
+            ','
+          )}`;
+          logger.warn(errMsg);
+          return res.customError({ body: errMsg, statusCode: 403 });
+        }
       }
       usageTracker.addInstall(params.id);
 

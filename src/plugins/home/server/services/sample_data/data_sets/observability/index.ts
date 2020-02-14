@@ -38,16 +38,16 @@ export const observabilitySpecProvider = function(): SampleDatasetSchema {
     previewImagePath: '/plugins/kibana/home/sample_data_resources/observability/dashboard.png',
     darkPreviewImagePath:
       '/plugins/kibana/home/sample_data_resources/observability/dashboard_dark.png',
-    overviewDashboard: 'edf84fe0-e1a0-11e7-b6d5-4dc382ef7f5b',
+    overviewDashboard: '2113cc58-d4b8-4af3-af0d-07ccdca42f01',
     appLinks: initialAppLinks,
-    defaultIndex: '90943e30-9a47-11e8-b64d-95841ca0b247',
+    defaultIndex: '7b7f33f0-d802-4604-a239-eb034aebafe9',
     savedObjects: [],
     dataIndices: [
       {
         id: 'apm',
         dataPath: path.join(__dirname, './apm.json.gz'),
         fields: apmFieldMappings,
-        timeFields: ['timestamp', 'utc_time'],
+        timeFields: ['@timestamp', 'utc_time'],
         currentTimeMarker: '2018-08-01T00:00:00',
         preserveDayOfWeekTimeOfDay: true,
       },
@@ -55,7 +55,7 @@ export const observabilitySpecProvider = function(): SampleDatasetSchema {
         id: 'logs',
         dataPath: path.join(__dirname, './logs.json.gz'),
         fields: logsFieldMappings,
-        timeFields: ['timestamp', 'utc_time'],
+        timeFields: ['@timestamp', 'utc_time'],
         currentTimeMarker: '2018-08-01T00:00:00',
         preserveDayOfWeekTimeOfDay: true,
       },
