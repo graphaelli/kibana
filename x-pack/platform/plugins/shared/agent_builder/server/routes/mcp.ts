@@ -15,12 +15,108 @@ import type { RouteDependencies } from './types';
 import { getHandlerWrapper } from './wrap_handler';
 import { KibanaMcpHttpTransport } from '../utils/mcp/kibana_mcp_http_transport';
 import { MCP_SERVER_PATH } from '../../common/mcp';
+import { publicApiPath } from '../../common/constants';
+import type { CreateMcpApiKeyResponse } from '../../common/http_api/mcp';
 
 const MCP_SERVER_NAME = 'elastic-mcp-server';
 const MCP_SERVER_VERSION = '0.0.1';
 
 export function registerMCPRoutes({ router, getInternalServices, logger }: RouteDependencies) {
   const wrapHandler = getHandlerWrapper({ logger });
+
+  // Create MCP API key route
+  router.versioned
+    .post({
+      path: `${publicApiPath}/mcp/api_key`,
+      security: {
+        authz: { requiredPrivileges: [apiPrivileges.readAgentBuilder] },
+      },
+      access: 'public',
+      summary: 'Generate MCP API key',
+      description:
+        'Generate an API key for accessing the MCP server. Returns the API key and complete MCP configuration ready to copy into your MCP client (Claude Desktop, Cursor, etc.).',
+      options: {
+        tags: ['mcp', 'oas-tag:agent builder'],
+        availability: {
+          since: '9.2.0',
+        },
+      },
+    })
+    .addVersion(
+      {
+        version: '2023-10-31',
+        validate: {
+          request: {
+            body: schema.object({
+              name: schema.maybe(
+                schema.string({
+                  meta: {
+                    description:
+                      'Optional name for the API key. If not provided, a default name will be generated.',
+                  },
+                })
+              ),
+            }),
+          },
+        },
+      },
+      wrapHandler(async (ctx, request, response) => {
+        const { elasticsearch, savedObjects } = ctx.core;
+        const kibanaRequest = request;
+
+        try {
+          // Get the current Kibana URL from the request
+          const kibanaUrl = `${request.url.protocol}//${request.url.host}`;
+
+          // Generate a default name if not provided
+          const keyName =
+            request.body.name || `mcp-agent-builder-${new Date().toISOString().split('T')[0]}`;
+
+          // Create API key that inherits the current user's privileges
+          // This allows the API key to access Agent Builder with the same permissions as the user
+          const apiKeyResponse = await elasticsearch.client.asCurrentUser.security.createApiKey({
+            name: keyName,
+            role_descriptors: {},
+            metadata: {
+              purpose: 'mcp_server_access',
+              created_at: new Date().toISOString(),
+            },
+          });
+
+          const mcpServerUrl = `${kibanaUrl}${MCP_SERVER_PATH}`;
+
+          // Create the complete MCP configuration
+          const mcpConfig = {
+            mcpServers: {
+              'elastic-agent-builder': {
+                url: mcpServerUrl,
+                headers: {
+                  Authorization: `ApiKey ${apiKeyResponse.encoded}`,
+                },
+              },
+            },
+          };
+
+          return response.ok<CreateMcpApiKeyResponse>({
+            body: {
+              id: apiKeyResponse.id,
+              name: apiKeyResponse.name,
+              encoded: apiKeyResponse.encoded,
+              serverUrl: mcpServerUrl,
+              mcpConfig,
+            },
+          });
+        } catch (error) {
+          logger.error('Error creating MCP API key', { error });
+          return response.customError({
+            statusCode: 500,
+            body: {
+              message: `Failed to create MCP API key: ${error}`,
+            },
+          });
+        }
+      })
+    );
 
   router.versioned
     .post({

@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   EuiPopover,
   EuiText,
@@ -21,6 +21,7 @@ import { useKibanaUrl } from '../../../hooks/use_kibana_url';
 import { MCP_SERVER_PATH } from '../../../../../common/mcp';
 import { useNavigation } from '../../../hooks/use_navigation';
 import { appPaths } from '../../../utils/app_paths';
+import { McpConfigModal } from './mcp_config_modal';
 
 export const McpConnectionButton = () => {
   const { createAgentBuilderUrl } = useNavigation();
@@ -28,67 +29,87 @@ export const McpConnectionButton = () => {
   const { docLinksService } = useAgentBuilderServices();
 
   const [isContextOpen, toggleContextOpen] = useToggle(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const mcpServerUrl = `${kibanaUrl}${MCP_SERVER_PATH}`;
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+    toggleContextOpen(false);
+  };
+
   return (
-    <EuiPopover
-      button={
-        <EuiButtonEmpty
-          key="mcp-server-connection-button"
-          iconType="arrowDown"
-          iconSide="right"
-          onClick={toggleContextOpen}
-          data-test-subj="agentBuilderManageMcpButton"
-        >
-          <EuiText size="s">
-            {i18n.translate('xpack.agentBuilder.tools.mcpServerConnectionButton', {
-              defaultMessage: 'Manage MCP',
-            })}
-          </EuiText>
-        </EuiButtonEmpty>
-      }
-      isOpen={isContextOpen}
-      closePopover={() => toggleContextOpen(false)}
-      anchorPosition="downLeft"
-      panelPaddingSize="none"
-    >
-      <EuiContextMenuPanel
-        items={[
-          <EuiCopy
-            key="copy"
-            textToCopy={mcpServerUrl}
-            tooltipProps={{ anchorClassName: 'eui-fullWidth' }}
+    <>
+      <EuiPopover
+        button={
+          <EuiButtonEmpty
+            key="mcp-server-connection-button"
+            iconType="arrowDown"
+            iconSide="right"
+            onClick={toggleContextOpen}
+            data-test-subj="agentBuilderManageMcpButton"
           >
-            {(copy) => (
-              <EuiContextMenuItem key="copy" icon="copy" onClick={copy}>
-                {i18n.translate('xpack.agentBuilder.tools.copyMcpServerUrlButton', {
-                  defaultMessage: 'Copy MCP Server URL',
-                })}
-              </EuiContextMenuItem>
-            )}
-          </EuiCopy>,
-          <EuiContextMenuItem
-            key="bulkImportMcpTools"
-            icon="plus"
-            href={createAgentBuilderUrl(appPaths.tools.bulkImportMcp)}
-            data-test-subj="agentBuilderBulkImportMcpMenuItem"
-          >
-            {i18n.translate('xpack.agentBuilder.tools.bulkImportMcpToolsButton', {
-              defaultMessage: 'Bulk import MCP tools',
-            })}
-          </EuiContextMenuItem>,
-          <EuiContextMenuItem
-            key="documentation"
-            icon="documentation"
-            href={docLinksService.mcpServer}
-            target="_blank"
-          >
-            {i18n.translate('xpack.agentBuilder.tools.aboutMcpServerDocumentationButton', {
-              defaultMessage: 'Documentation',
-            })}
-          </EuiContextMenuItem>,
-        ]}
-      />
-    </EuiPopover>
+            <EuiText size="s">
+              {i18n.translate('xpack.agentBuilder.tools.mcpServerConnectionButton', {
+                defaultMessage: 'Manage MCP',
+              })}
+            </EuiText>
+          </EuiButtonEmpty>
+        }
+        isOpen={isContextOpen}
+        closePopover={() => toggleContextOpen(false)}
+        anchorPosition="downLeft"
+        panelPaddingSize="none"
+      >
+        <EuiContextMenuPanel
+          items={[
+            <EuiContextMenuItem
+              key="getConfig"
+              icon="keyboardShortcut"
+              onClick={handleOpenModal}
+              data-test-subj="agentBuilderGetMcpConfigMenuItem"
+            >
+              {i18n.translate('xpack.agentBuilder.tools.getMcpConfigButton', {
+                defaultMessage: 'Get MCP configuration',
+              })}
+            </EuiContextMenuItem>,
+            <EuiCopy
+              key="copy"
+              textToCopy={mcpServerUrl}
+              tooltipProps={{ anchorClassName: 'eui-fullWidth' }}
+            >
+              {(copy) => (
+                <EuiContextMenuItem key="copy" icon="copy" onClick={copy}>
+                  {i18n.translate('xpack.agentBuilder.tools.copyMcpServerUrlButton', {
+                    defaultMessage: 'Copy MCP Server URL',
+                  })}
+                </EuiContextMenuItem>
+              )}
+            </EuiCopy>,
+            <EuiContextMenuItem
+              key="bulkImportMcpTools"
+              icon="plus"
+              href={createAgentBuilderUrl(appPaths.tools.bulkImportMcp)}
+              data-test-subj="agentBuilderBulkImportMcpMenuItem"
+            >
+              {i18n.translate('xpack.agentBuilder.tools.bulkImportMcpToolsButton', {
+                defaultMessage: 'Bulk import MCP tools',
+              })}
+            </EuiContextMenuItem>,
+            <EuiContextMenuItem
+              key="documentation"
+              icon="documentation"
+              href={docLinksService.mcpServer}
+              target="_blank"
+            >
+              {i18n.translate('xpack.agentBuilder.tools.aboutMcpServerDocumentationButton', {
+                defaultMessage: 'Documentation',
+              })}
+            </EuiContextMenuItem>,
+          ]}
+        />
+      </EuiPopover>
+      {isModalOpen && <McpConfigModal onClose={() => setIsModalOpen(false)} />}
+    </>
   );
 };
