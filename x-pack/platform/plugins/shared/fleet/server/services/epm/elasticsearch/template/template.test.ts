@@ -38,6 +38,7 @@ import {
   STACK_COMPONENT_TEMPLATE_ECS_MAPPINGS,
   FLEET_GLOBALS_COMPONENT_TEMPLATE_NAME,
   STACK_COMPONENT_TEMPLATE_LOGS_SETTINGS,
+  STACK_COMPONENT_TEMPLATE_METRICS_TSDB_SETTINGS,
 } from '../../../../constants';
 
 import {
@@ -371,6 +372,36 @@ describe('EPM template', () => {
         OTEL_COMPONENT_TEMPLATE_SETTINGS,
         OTEL_COMPONENT_TEMPLATE_METRICS_MAPPINGS,
         OTEL_COMPONENT_SEMCONV_RESOURCE_TO_ECS_MAPPINGS,
+        ...composedOfTemplates,
+        FLEET_GLOBALS_COMPONENT_TEMPLATE_NAME,
+        FLEET_AGENT_ID_VERIFY_COMPONENT_TEMPLATE_NAME,
+      ]);
+    });
+
+    it('adds composed_of correctly for otel input packages of type metrics with time series mode', () => {
+      const composedOfTemplates = [
+        'metrics-check@package',
+        'metrics@custom',
+        OTEL_COMPONENT_TEMPLATE_METRICS_CUSTOM_MAPPINGS,
+        'httpcheck@custom',
+        'metrics-check@custom',
+      ];
+
+      const template = getTemplate({
+        templateIndexPattern: 'metrics.otel-*',
+        type: 'metrics',
+        packageName: 'otel-test',
+        composedOfTemplates,
+        templatePriority: 200,
+        isOtelInputType: true,
+        isIndexModeTimeSeries: true,
+      });
+      expect(template.composed_of).toStrictEqual([
+        OTEL_COMPONENT_TEMPLATE_MAPPINGS,
+        OTEL_COMPONENT_TEMPLATE_SETTINGS,
+        OTEL_COMPONENT_TEMPLATE_METRICS_MAPPINGS,
+        OTEL_COMPONENT_SEMCONV_RESOURCE_TO_ECS_MAPPINGS,
+        STACK_COMPONENT_TEMPLATE_METRICS_TSDB_SETTINGS,
         ...composedOfTemplates,
         FLEET_GLOBALS_COMPONENT_TEMPLATE_NAME,
         FLEET_AGENT_ID_VERIFY_COMPONENT_TEMPLATE_NAME,
