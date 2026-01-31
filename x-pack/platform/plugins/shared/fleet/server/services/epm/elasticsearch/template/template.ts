@@ -149,7 +149,7 @@ const getBaseEsComponents = (
   isOTelInputType?: boolean
 ): string[] => {
   if (isOTelInputType) {
-    return getOtelBaseComponents(type);
+    return getOtelBaseComponents(type, isIndexModeTimeSeries);
   }
 
   if (type === 'metrics') {
@@ -165,8 +165,15 @@ const getBaseEsComponents = (
   return [];
 };
 
-const getOtelBaseComponents = (type: string): string[] => {
+const getOtelBaseComponents = (type: string, isIndexModeTimeSeries: boolean): string[] => {
   if (type === 'metrics') {
+    // For OTEL metrics, include TSDB settings when time series mode is enabled
+    if (isIndexModeTimeSeries) {
+      return [
+        ...OTEL_METRICS_COMPONENT_TEMPLATES,
+        STACK_COMPONENT_TEMPLATE_METRICS_TSDB_SETTINGS,
+      ];
+    }
     return OTEL_METRICS_COMPONENT_TEMPLATES;
   } else if (type === 'logs') {
     return OTEL_LOGS_COMPONENT_TEMPLATES;
