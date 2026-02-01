@@ -149,6 +149,25 @@ describe('Fetch', () => {
       expect(fetchMock.lastUrl()).toBe('http://localhost/myBase/my/path?a=b');
     });
 
+    it('should strip credentials from URL when accessing Kibana with HTTP basic auth', async () => {
+      // Mock window.location to simulate HTTP basic auth in the URL
+      const originalLocation = window.location;
+      delete (window as any).location;
+      window.location = { href: 'http://user:pass@localhost:5601/' } as any;
+
+      fetchMock.get('*', {});
+      await fetchInstance.fetch('/my/path');
+
+      // The URL should have credentials stripped
+      const lastUrl = fetchMock.lastUrl();
+      expect(lastUrl).toBe('http://localhost/myBase/my/path');
+      expect(lastUrl).not.toContain('user');
+      expect(lastUrl).not.toContain('pass');
+
+      // Restore original location
+      window.location = originalLocation;
+    });
+
     it('should use supplied headers', async () => {
       fetchMock.get('*', {});
       await fetchInstance.fetch('/my/path', {

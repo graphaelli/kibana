@@ -719,5 +719,34 @@ describe.skip('I18n engine', () => {
 
       expect(i18n.getTranslation()).toEqual(createExpectedTranslations('en-xa', translations));
     });
+
+    test('strips credentials from URL when present', async () => {
+      const translations: TranslationInput = {
+        locale: 'en',
+        messages: { test: 'test' },
+      };
+
+      mockFetch.mockResolvedValue({
+        status: 200,
+        json: jest.fn().mockResolvedValue(translations),
+      });
+
+      // Mock window.location for URL construction
+      const originalLocation = window.location;
+      delete (window as any).location;
+      window.location = { href: 'http://user:pass@localhost:5601/' } as any;
+
+      await expect(i18n.load('/translations/en.json')).resolves.toBeUndefined();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Should strip credentials from the URL
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:5601/translations/en.json',
+        { credentials: 'same-origin' }
+      );
+
+      // Restore original location
+      window.location = originalLocation;
+    });
   });
 });
