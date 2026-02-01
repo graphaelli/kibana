@@ -198,13 +198,34 @@ export function init(newTranslation?: TranslationInput) {
 }
 
 /**
+ * Strips username and password from a URL string if present.
+ * This is necessary because the Fetch API doesn't allow URLs with embedded credentials.
+ * @param urlString - The URL to sanitize
+ * @returns URL string without credentials
+ */
+function stripCredentialsFromUrl(urlString: string): string {
+  try {
+    const url = new URL(urlString, window.location.href);
+    // Remove username and password
+    url.username = '';
+    url.password = '';
+    return url.href;
+  } catch (e) {
+    // If URL parsing fails, return the original string
+    return urlString;
+  }
+}
+
+/**
  * Loads JSON with translations from the specified URL and initializes i18n engine with them.
  * @param translationsUrl URL pointing to the JSON bundle with translations.
  */
 export async function load(translationsUrl: string) {
   // Once this package is integrated into core Kibana we should switch to an abstraction
   // around `fetch` provided by the platform, e.g. `kfetch`.
-  const response = await fetch(translationsUrl, {
+  // Strip credentials from the URL to avoid Fetch API errors when basic auth is used
+  const sanitizedUrl = stripCredentialsFromUrl(translationsUrl);
+  const response = await fetch(sanitizedUrl, {
     credentials: 'same-origin',
   });
 

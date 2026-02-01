@@ -150,10 +150,24 @@ export class Fetch {
       }),
     };
 
-    const url = format({
+    let url = format({
       pathname: shouldPrependBasePath ? this.params.basePath.prepend(options.path) : options.path,
       query: removedUndefined(query),
     });
+
+    // Strip credentials from URL if present. This is necessary because the Fetch API
+    // doesn't allow URLs with embedded credentials (e.g., http://user:pass@host:port).
+    // This can happen when accessing Kibana with HTTP Basic Auth in the URL.
+    try {
+      const urlObj = new URL(url, window.location.href);
+      if (urlObj.username || urlObj.password) {
+        urlObj.username = '';
+        urlObj.password = '';
+        url = urlObj.href;
+      }
+    } catch (e) {
+      // If URL parsing fails, continue with the original URL
+    }
 
     // Make sure the system request header is only present if `asSystemRequest` is true.
     if (asSystemRequest) {
