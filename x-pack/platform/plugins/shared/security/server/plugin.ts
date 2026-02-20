@@ -52,6 +52,7 @@ import { SecurityFeatureUsageService } from './feature_usage';
 import { securityFeatures } from './features';
 import type { FipsServiceSetupInternal } from './fips';
 import { FipsService } from './fips';
+import { OAuthAuthorizationService } from './oauth_authorization';
 import { defineRoutes } from './routes';
 import { setupSavedObjects } from './saved_objects';
 import type { Session } from './session_management';
@@ -183,6 +184,14 @@ export class SecurityPlugin
 
   private readonly fipsService: FipsService;
   private fipsServiceSetup?: FipsServiceSetupInternal;
+
+  private oauthAuthorizationService?: OAuthAuthorizationService;
+  private readonly getOAuthService = () => {
+    if (!this.oauthAuthorizationService) {
+      throw new Error('OAuth Authorization Service is not available.');
+    }
+    return this.oauthAuthorizationService;
+  };
 
   constructor(private readonly initializerContext: PluginInitializerContext) {
     this.logger = this.initializerContext.logger.get();
@@ -356,6 +365,7 @@ export class SecurityPlugin
       getAuthenticationService: this.getAuthentication,
       getAnonymousAccessService: this.getAnonymousAccess,
       getUserProfileService: this.getUserProfileService,
+      getOAuthService: this.getOAuthService,
       analyticsService: this.analyticsService.setup({ analytics: core.analytics }),
       buildFlavor: this.initializerContext.env.packageInfo.buildFlavor,
       docLinks: core.docLinks,
@@ -441,6 +451,14 @@ export class SecurityPlugin
       online$: watchOnlineStatus$(),
     });
 
+    this.oauthAuthorizationService = new OAuthAuthorizationService({
+      logger: this.initializerContext.logger.get('oauth'),
+      clusterClient,
+      applicationName: this.authorizationSetup!.applicationName,
+      kibanaFeatures: features.getKibanaFeatures(),
+    });
+    this.oauthAuthorizationService.start();
+
     this.anonymousAccessStart = this.anonymousAccessService.start({
       capabilities: core.capabilities,
       clusterClient,
@@ -497,6 +515,11 @@ export class SecurityPlugin
     this.auditService.stop();
     this.authorizationService.stop();
     this.sessionManagementService.stop();
+
+    if (this.oauthAuthorizationService) {
+      this.oauthAuthorizationService.stop();
+      this.oauthAuthorizationService = undefined;
+    }
   }
 
   private registerDeprecations(core: CoreSetup, license: SecurityLicense) {

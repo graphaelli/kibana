@@ -21,6 +21,7 @@ import { defineAuthorizationRoutes } from './authorization';
 import { defineDeprecationsRoutes } from './deprecations';
 import { defineSecurityFeatureRoutes } from './feature_check';
 import { defineIndicesRoutes } from './indices';
+import { defineOAuthRoutes, type OAuthRouteParams } from './oauth';
 import { defineRoleMappingRoutes } from './role_mapping';
 import { defineSecurityCheckupGetStateRoutes } from './security_checkup';
 import { defineSessionManagementRoutes } from './session_management';
@@ -34,6 +35,7 @@ import type { InternalAuthenticationServiceStart } from '../authentication';
 import type { AuthorizationServiceSetupInternal } from '../authorization';
 import type { ConfigType } from '../config';
 import type { SecurityFeatureUsageServiceStart } from '../feature_usage';
+import type { OAuthAuthorizationService } from '../oauth_authorization';
 import type { Session } from '../session_management';
 import type { SecurityRouter } from '../types';
 import type { UserProfileServiceStartInternal } from '../user_profile';
@@ -57,6 +59,7 @@ export interface RouteDefinitionParams {
   getAuthenticationService: () => InternalAuthenticationServiceStart;
   getUserProfileService: () => UserProfileServiceStartInternal;
   getAnonymousAccessService: () => AnonymousAccessServiceStart;
+  getOAuthService?: () => OAuthAuthorizationService;
   analyticsService: AnalyticsServiceSetup;
   buildFlavor: BuildFlavor;
   docLinks: DocLinksServiceSetup;
@@ -71,6 +74,11 @@ export function defineRoutes(params: RouteDefinitionParams) {
   defineUserProfileRoutes(params);
   defineUsersRoutes(params); // Temporarily allow user APIs (ToDo: move to non-serverless block below)
   defineViewRoutes(params);
+
+  // OAuth authorization server routes
+  if (params.getOAuthService) {
+    defineOAuthRoutes(params as OAuthRouteParams);
+  }
 
   // In the serverless environment...
   if (params.buildFlavor !== 'serverless') {
