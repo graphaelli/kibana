@@ -19,7 +19,6 @@ import { loggedOutApp } from './logged_out';
 import { loginApp } from './login';
 import { logoutApp } from './logout';
 import { oauthConsentApp } from './oauth_consent';
-import { oauthGrantsApp } from './oauth_grants';
 import { overwrittenSessionApp } from './overwritten_session';
 import { resetSessionApp } from './reset_session';
 import { unauthenticatedApp } from './unauthenticated';
@@ -55,7 +54,6 @@ export class AuthenticationService {
     logoutApp.create({ application, http });
     loggedOutApp.create({ application, getStartServices, http });
     oauthConsentApp.create({ application, getStartServices });
-    oauthGrantsApp.create({ application, getStartServices });
     overwrittenSessionApp.create({ application, authc: { getCurrentUser }, getStartServices });
     resetSessionApp.create({ application, getStartServices, http });
     unauthenticatedApp.create({ application, getStartServices, http });

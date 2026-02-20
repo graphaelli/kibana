@@ -262,7 +262,7 @@ export class OAuthAuthorizationService {
       success: true,
       token: {
         access_token: authCode.apiKeyEncoded,
-        token_type: 'Bearer',
+        token_type: 'ApiKey',
         expires_in: DEFAULT_TOKEN_EXPIRATION_SECONDS,
         scope: authCode.scope.join(' '),
       },
@@ -327,38 +327,4 @@ export class OAuthAuthorizationService {
     };
   }
 
-  getGrantsForUser(userId: string): OAuthGrant[] {
-    const userGrants: OAuthGrant[] = [];
-    const now = Date.now();
-
-    for (const grant of this.grants.values()) {
-      if (grant.userId === userId && grant.expiresAt > now) {
-        userGrants.push(grant);
-      }
-    }
-
-    return userGrants;
-  }
-
-  async revokeGrant(request: KibanaRequest, grantId: string, userId: string): Promise<boolean> {
-    const grant = this.grants.get(grantId);
-
-    if (!grant || grant.userId !== userId) {
-      return false;
-    }
-
-    try {
-      await this.clusterClient
-        .asScoped(request)
-        .asCurrentUser.security.invalidateApiKey({ ids: [grant.apiKeyId] });
-
-      this.grants.delete(grantId);
-      this.logger.info(`Revoked OAuth grant ${grantId} for user ${userId}`);
-
-      return true;
-    } catch (error) {
-      this.logger.error(`Failed to revoke grant ${grantId}: ${error.message}`);
-      return false;
-    }
-  }
 }

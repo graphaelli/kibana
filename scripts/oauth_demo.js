@@ -307,7 +307,7 @@ async function runDiscoverQuery(kibanaUrl, accessToken, { insecure = false } = {
   const dvResponse = await httpRequest(dataViewsUrl, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `ApiKey ${accessToken}`,
       'kbn-xsrf': 'true',
     },
   }, null, { insecure });
@@ -342,7 +342,7 @@ async function listDashboards(kibanaUrl, accessToken, { insecure = false } = {})
   const response = await httpRequest(dashboardsUrl, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `ApiKey ${accessToken}`,
       'kbn-xsrf': 'true',
     },
   }, null, { insecure });
@@ -468,10 +468,12 @@ async function main() {
   console.log('🎉 OAuth demo completed successfully!');
   console.log('═'.repeat(60));
   console.log(`\nYou can use this access token to make authenticated requests:`);
-  console.log(`\n  curl -H "Authorization: Bearer ${tokenResponse.access_token}" \\`);
+  console.log(`\n  curl -H "Authorization: ApiKey ${tokenResponse.access_token}" \\`);
   console.log(`       "${kibanaUrl}/api/saved_objects/_find?type=dashboard"`);
   console.log(`\nThe token expires in ${Math.round(tokenResponse.expires_in / 60)} minutes.`);
-  console.log(`\nTo revoke the grant, visit: ${kibanaUrl}/security/oauth_grants`);
+  console.log(`\nTo revoke the token, visit API Keys management: ${kibanaUrl}/app/management/security/api_keys`);
+
+  process.exit(0);
 }
 
 main().catch((err) => {

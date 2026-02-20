@@ -9,7 +9,6 @@ import type { RouteDefinitionParams } from '..';
 import type { OAuthAuthorizationService } from '../../oauth_authorization';
 import { defineAuthorizeRoutes } from './authorize';
 import { defineConsentRoutes } from './consent';
-import { defineGrantsRoutes } from './grants';
 import { defineTokenRoutes } from './token';
 
 export interface OAuthRouteParams extends RouteDefinitionParams {
@@ -20,5 +19,4 @@ export function defineOAuthRoutes(params: OAuthRouteParams) {
   defineAuthorizeRoutes(params);
   defineTokenRoutes(params);
   defineConsentRoutes(params);
-  defineGrantsRoutes(params);
 }

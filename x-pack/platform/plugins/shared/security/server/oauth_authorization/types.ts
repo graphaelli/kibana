@@ -52,7 +52,7 @@ export interface TokenRequest {
 
 export interface TokenResponse {
   access_token: string;
-  token_type: 'Bearer';
+  token_type: 'ApiKey';
   expires_in: number;
   scope: string;
 }
