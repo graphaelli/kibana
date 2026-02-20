@@ -117,15 +117,16 @@ export function defineConsentRoutes({
         return response.unauthorized();
       }
 
-      const result = oauthService.approveAuthorization(
+      const result = await oauthService.approveAuthorization(
         request.body.request_id,
         currentUser.username,
-        currentUser.username
+        currentUser.username,
+        request
       );
 
       if (!result.success) {
         return response.badRequest({
-          body: { message: 'Authorization request not found or expired' },
+          body: { message: result.error || 'Authorization request not found or expired' },
         });
       }
 

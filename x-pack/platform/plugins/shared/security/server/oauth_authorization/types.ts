@@ -39,6 +39,8 @@ export interface AuthorizationCode {
   codeChallengeMethod: 'S256';
   expiresAt: number;
   createdAt: number;
+  apiKeyId: string;
+  apiKeyEncoded: string;
 }
 
 export interface TokenRequest {

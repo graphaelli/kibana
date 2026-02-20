@@ -18,7 +18,6 @@ import {
   EuiSkeletonText,
   EuiSpacer,
   EuiText,
-  EuiTitle,
 } from '@elastic/eui';
 import { css } from '@emotion/react';
 import type { MouseEvent } from 'react';
@@ -58,7 +57,6 @@ interface Props {
 }
 
 export function OAuthConsentPage({ http, fatalErrors, notifications }: Props) {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isDenying, setIsDenying] = useState<boolean>(false);
   const [consentState, setConsentState] = useState<ConsentState | null>(null);

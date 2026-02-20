@@ -8,7 +8,6 @@
 import { schema } from '@kbn/config-schema';
 
 import type { OAuthRouteParams } from '.';
-import { createLicensedRouteHandler } from '../licensed_route_handler';
 
 export function defineTokenRoutes({ router, logger, getOAuthService }: OAuthRouteParams) {
   router.post(
@@ -23,6 +22,7 @@ export function defineTokenRoutes({ router, logger, getOAuthService }: OAuthRout
         }),
       },
       options: {
+        access: 'public',
         authRequired: false,
         excludeFromOAS: true,
         xsrfRequired: false,
@@ -35,7 +35,7 @@ export function defineTokenRoutes({ router, logger, getOAuthService }: OAuthRout
         },
       },
     },
-    createLicensedRouteHandler(async (context, request, response) => {
+    async (context, request, response) => {
       const oauthService = getOAuthService();
 
       const result = await oauthService.exchangeCodeForToken({
@@ -43,16 +43,19 @@ export function defineTokenRoutes({ router, logger, getOAuthService }: OAuthRout
         code: request.body.code,
         redirectUri: request.body.redirect_uri,
         codeVerifier: request.body.code_verifier,
-        request,
       });
 
       if (!result.success) {
         logger.warn(`Token exchange failed: ${result.error}`);
 
-        return response.badRequest({
+        return response.custom({
+          statusCode: 400,
           body: {
             error: result.error,
             error_description: result.errorDescription,
+          },
+          headers: {
+            'Content-Type': 'application/json',
           },
         });
       }
@@ -64,6 +67,6 @@ export function defineTokenRoutes({ router, logger, getOAuthService }: OAuthRout
         },
         body: result.token,
       });
-    })
+    }
   );
 }

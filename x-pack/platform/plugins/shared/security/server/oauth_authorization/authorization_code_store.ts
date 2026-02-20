@@ -79,7 +79,8 @@ export class AuthorizationCodeStore {
   generateCode(
     pendingRequest: PendingAuthorizationRequest,
     userId: string,
-    username: string
+    username: string,
+    apiKey: { id: string; encoded: string }
   ): string {
     const code = this.generateSecureId();
 
@@ -93,6 +94,8 @@ export class AuthorizationCodeStore {
       codeChallengeMethod: pendingRequest.codeChallengeMethod,
       createdAt: Date.now(),
       expiresAt: Date.now() + CODE_EXPIRATION_MS,
+      apiKeyId: apiKey.id,
+      apiKeyEncoded: apiKey.encoded,
     };
 
     this.codes.set(code, authCode);

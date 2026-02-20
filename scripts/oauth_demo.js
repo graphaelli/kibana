@@ -21,11 +21,16 @@
  * 7. Displays the results
  *
  * Usage:
- *   node scripts/oauth_demo.js [kibana_url]
+ *   node scripts/oauth_demo.js [options] [kibana_url]
+ *
+ * Options:
+ *   -k, --insecure    Allow connections to SSL sites without valid certificates
+ *   -h, --help        Show this help message
  *
  * Example:
  *   node scripts/oauth_demo.js http://localhost:5601
  *   node scripts/oauth_demo.js https://my-kibana.example.com
+ *   node scripts/oauth_demo.js --insecure https://localhost:5601
  */
 
 const http = require('http');
@@ -37,6 +42,48 @@ const { exec } = require('child_process');
 const CALLBACK_PORT = 8765;
 const CALLBACK_PATH = '/oauth/callback';
 const SCOPES = ['read:discover', 'read:dashboards', 'read:data_views'];
+
+function parseArgs(args) {
+  const result = {
+    kibanaUrl: 'http://localhost:5601',
+    insecure: false,
+    help: false,
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '-k' || arg === '--insecure') {
+      result.insecure = true;
+    } else if (arg === '-h' || arg === '--help') {
+      result.help = true;
+    } else if (!arg.startsWith('-')) {
+      result.kibanaUrl = arg;
+    }
+  }
+
+  return result;
+}
+
+function showHelp() {
+  console.log(`
+OAuth Authorization Demo Script
+
+Demonstrates the OAuth 2.0 Authorization Code flow with PKCE for Kibana.
+
+Usage:
+  node scripts/oauth_demo.js [options] [kibana_url]
+
+Options:
+  -k, --insecure    Allow connections to SSL sites without valid certificates
+                    (useful for development with self-signed certs)
+  -h, --help        Show this help message
+
+Examples:
+  node scripts/oauth_demo.js # defaults to http://localhost:5601
+  node scripts/oauth_demo.js https://my-kibana.example.com
+  node scripts/oauth_demo.js --insecure https://localhost:5601
+`);
+}
 
 function generateRandomString(length) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -83,18 +130,20 @@ function openBrowser(url) {
   });
 }
 
-function httpRequest(url, options, body) {
+function httpRequest(url, options, body, { insecure = false } = {}) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
     const isHttps = parsedUrl.protocol === 'https:';
     const lib = isHttps ? https : http;
 
+    const requestOptions = { ...options };
+    if (insecure && isHttps) {
+      requestOptions.rejectUnauthorized = false;
+    }
+
     const req = lib.request(
       url,
-      {
-        ...options,
-        rejectUnauthorized: false, // For self-signed certs in dev
-      },
+      requestOptions,
       (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
@@ -213,7 +262,7 @@ async function startCallbackServer(expectedState) {
   });
 }
 
-async function exchangeCodeForToken(kibanaUrl, code, codeVerifier, redirectUri) {
+async function exchangeCodeForToken(kibanaUrl, code, codeVerifier, redirectUri, { insecure = false } = {}) {
   const tokenUrl = `${kibanaUrl}/oauth/token`;
 
   const body = new URLSearchParams({
@@ -230,17 +279,26 @@ async function exchangeCodeForToken(kibanaUrl, code, codeVerifier, redirectUri) 
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-  }, body);
+  }, body, { insecure });
 
   if (response.statusCode !== 200) {
-    const errorBody = JSON.parse(response.body);
-    throw new Error(`Token exchange failed: ${errorBody.error} - ${errorBody.error_description}`);
+    let errorBody;
+    try {
+      errorBody = JSON.parse(response.body);
+    } catch {
+      throw new Error(`Token exchange failed with status ${response.statusCode}: ${response.body}`);
+    }
+    throw new Error(
+      `Token exchange failed: ${errorBody.error || 'unknown_error'}` +
+        (errorBody.error_description ? ` - ${errorBody.error_description}` : '') +
+        (errorBody.message ? ` - ${errorBody.message}` : '')
+    );
   }
 
   return JSON.parse(response.body);
 }
 
-async function runDiscoverQuery(kibanaUrl, accessToken) {
+async function runDiscoverQuery(kibanaUrl, accessToken, { insecure = false } = {}) {
   console.log('\n🔍 Running a discover query...');
 
   // First, get available data views
@@ -252,7 +310,7 @@ async function runDiscoverQuery(kibanaUrl, accessToken) {
       Authorization: `Bearer ${accessToken}`,
       'kbn-xsrf': 'true',
     },
-  });
+  }, null, { insecure });
 
   if (dvResponse.statusCode !== 200) {
     console.log(`\n⚠️  Could not fetch data views (status ${dvResponse.statusCode})`);
@@ -276,7 +334,7 @@ async function runDiscoverQuery(kibanaUrl, accessToken) {
   return dataViews;
 }
 
-async function listDashboards(kibanaUrl, accessToken) {
+async function listDashboards(kibanaUrl, accessToken, { insecure = false } = {}) {
   console.log('\n📋 Fetching dashboards...');
 
   const dashboardsUrl = `${kibanaUrl}/api/saved_objects/_find?type=dashboard&per_page=10`;
@@ -287,7 +345,7 @@ async function listDashboards(kibanaUrl, accessToken) {
       Authorization: `Bearer ${accessToken}`,
       'kbn-xsrf': 'true',
     },
-  });
+  }, null, { insecure });
 
   if (response.statusCode !== 200) {
     console.log(`\n⚠️  Could not fetch dashboards (status ${response.statusCode})`);
@@ -309,12 +367,22 @@ async function listDashboards(kibanaUrl, accessToken) {
 }
 
 async function main() {
-  const kibanaUrl = process.argv[2] || 'http://localhost:5601';
+  const args = parseArgs(process.argv.slice(2));
+
+  if (args.help) {
+    showHelp();
+    process.exit(0);
+  }
+
+  const { kibanaUrl, insecure } = args;
 
   console.log('╔════════════════════════════════════════════════════════════════╗');
   console.log('║           Kibana OAuth Authorization Demo                      ║');
   console.log('╚════════════════════════════════════════════════════════════════╝');
   console.log(`\nKibana URL: ${kibanaUrl}`);
+  if (insecure) {
+    console.log('⚠️  SSL certificate verification disabled (--insecure)');
+  }
   console.log(`Requested scopes: ${SCOPES.join(', ')}`);
 
   // Step 1: Generate PKCE values
@@ -368,7 +436,7 @@ async function main() {
   // Step 5: Exchange code for token
   let tokenResponse;
   try {
-    tokenResponse = await exchangeCodeForToken(kibanaUrl, authorizationCode, codeVerifier, redirectUri);
+    tokenResponse = await exchangeCodeForToken(kibanaUrl, authorizationCode, codeVerifier, redirectUri, { insecure });
     console.log('\n✅ Access token received!');
     console.log(`   Token type: ${tokenResponse.token_type}`);
     console.log(`   Expires in: ${tokenResponse.expires_in} seconds`);
@@ -385,13 +453,13 @@ async function main() {
   console.log('─'.repeat(60));
 
   try {
-    await listDashboards(kibanaUrl, tokenResponse.access_token);
+    await listDashboards(kibanaUrl, tokenResponse.access_token, { insecure });
   } catch (err) {
     console.log(`\n⚠️  Dashboard query failed: ${err.message}`);
   }
 
   try {
-    await runDiscoverQuery(kibanaUrl, tokenResponse.access_token);
+    await runDiscoverQuery(kibanaUrl, tokenResponse.access_token, { insecure });
   } catch (err) {
     console.log(`\n⚠️  Discover query failed: ${err.message}`);
   }

@@ -6,37 +6,24 @@
  */
 
 import type { IClusterClient, KibanaRequest, Logger } from '@kbn/core/server';
-import type { KibanaFeature } from '@kbn/features-plugin/server';
 
-import {
-  AuthorizationCodeStore,
-  type PendingAuthorizationRequest,
-} from './authorization_code_store';
+import { AuthorizationCodeStore } from './authorization_code_store';
 import { verifyCodeChallenge } from './pkce';
 import { getScopesByIds, validateScopes } from './scopes';
-import type {
-  AuthorizationCode,
-  AuthorizationRequest,
-  ConsentState,
-  OAuthGrant,
-  TokenResponse,
-} from './types';
+import type { AuthorizationRequest, ConsentState, OAuthGrant, TokenResponse } from './types';
 
 const DEFAULT_TOKEN_EXPIRATION_SECONDS = 3600; // 1 hour
-const MAX_TOKEN_EXPIRATION_SECONDS = 86400; // 24 hours
 
 export interface OAuthAuthorizationServiceOptions {
   logger: Logger;
   clusterClient: IClusterClient;
   applicationName: string;
-  kibanaFeatures: KibanaFeature[];
 }
 
 export class OAuthAuthorizationService {
   private readonly logger: Logger;
   private readonly clusterClient: IClusterClient;
   private readonly applicationName: string;
-  private readonly kibanaFeatures: KibanaFeature[];
   private readonly codeStore: AuthorizationCodeStore;
   private readonly grants = new Map<string, OAuthGrant>();
 
@@ -44,7 +31,6 @@ export class OAuthAuthorizationService {
     this.logger = options.logger;
     this.clusterClient = options.clusterClient;
     this.applicationName = options.applicationName;
-    this.kibanaFeatures = options.kibanaFeatures;
     this.codeStore = new AuthorizationCodeStore(options.logger);
   }
 
@@ -148,31 +134,65 @@ export class OAuthAuthorizationService {
     };
   }
 
-  approveAuthorization(
+  async approveAuthorization(
     requestId: string,
     userId: string,
-    username: string
-  ): { success: true; code: string; redirectUri: string; state: string } | { success: false } {
+    username: string,
+    request: KibanaRequest
+  ): Promise<
+    | { success: true; code: string; redirectUri: string; state: string }
+    | { success: false; error?: string }
+  > {
     const pending = this.codeStore.consumePendingRequest(requestId);
 
     if (!pending) {
       this.logger.warn(`Failed to approve authorization: request ${requestId} not found`);
-      return { success: false };
+      return { success: false, error: 'Authorization request not found or expired' };
     }
 
     if (pending.userId !== userId) {
       this.logger.warn(`User mismatch for authorization request ${requestId}`);
-      return { success: false };
+      return { success: false, error: 'User mismatch' };
     }
 
-    const code = this.codeStore.generateCode(pending, userId, username);
+    try {
+      const apiKey = await this.createScopedApiKey(
+        request,
+        pending.scope,
+        username,
+        pending.redirectUri
+      );
 
-    return {
-      success: true,
-      code,
-      redirectUri: pending.redirectUri,
-      state: pending.state,
-    };
+      const apiKeyEncoded = Buffer.from(`${apiKey.id}:${apiKey.api_key}`).toString('base64');
+
+      const code = this.codeStore.generateCode(pending, userId, username, {
+        id: apiKey.id,
+        encoded: apiKeyEncoded,
+      });
+
+      const grant: OAuthGrant = {
+        id: apiKey.id,
+        userId,
+        username,
+        redirectUri: pending.redirectUri,
+        scope: pending.scope,
+        apiKeyId: apiKey.id,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + DEFAULT_TOKEN_EXPIRATION_SECONDS * 1000,
+      };
+
+      this.grants.set(grant.id, grant);
+
+      return {
+        success: true,
+        code,
+        redirectUri: pending.redirectUri,
+        state: pending.state,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to create API key during authorization: ${error.message}`);
+      return { success: false, error: 'Failed to create access credentials' };
+    }
   }
 
   denyAuthorization(
@@ -196,7 +216,6 @@ export class OAuthAuthorizationService {
     code: string;
     redirectUri: string;
     codeVerifier: string;
-    request: KibanaRequest;
   }): Promise<
     | { success: true; token: TokenResponse }
     | { success: false; error: string; errorDescription?: string }
@@ -235,46 +254,19 @@ export class OAuthAuthorizationService {
       };
     }
 
-    try {
-      const apiKey = await this.createScopedApiKey(
-        params.request,
-        authCode.scope,
-        authCode.username,
-        params.redirectUri
-      );
+    this.logger.info(
+      `Token exchange successful for user ${authCode.username}, scopes: ${authCode.scope.join(', ')}`
+    );
 
-      const grant: OAuthGrant = {
-        id: apiKey.id,
-        userId: authCode.userId,
-        username: authCode.username,
-        redirectUri: params.redirectUri,
-        scope: authCode.scope,
-        apiKeyId: apiKey.id,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + DEFAULT_TOKEN_EXPIRATION_SECONDS * 1000,
-      };
-
-      this.grants.set(grant.id, grant);
-
-      const accessToken = Buffer.from(`${apiKey.id}:${apiKey.api_key}`).toString('base64');
-
-      return {
-        success: true,
-        token: {
-          access_token: accessToken,
-          token_type: 'Bearer',
-          expires_in: DEFAULT_TOKEN_EXPIRATION_SECONDS,
-          scope: authCode.scope.join(' '),
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Failed to create API key for OAuth grant: ${error.message}`);
-      return {
-        success: false,
-        error: 'server_error',
-        errorDescription: 'Failed to create access token',
-      };
-    }
+    return {
+      success: true,
+      token: {
+        access_token: authCode.apiKeyEncoded,
+        token_type: 'Bearer',
+        expires_in: DEFAULT_TOKEN_EXPIRATION_SECONDS,
+        scope: authCode.scope.join(' '),
+      },
+    };
   }
 
   private async createScopedApiKey(
@@ -284,7 +276,7 @@ export class OAuthAuthorizationService {
     redirectUri: string
   ): Promise<{ id: string; api_key: string }> {
     const scopeDefinitions = getScopesByIds(scopes);
-    const roleDescriptors: Record<string, unknown> = {};
+    const roleDescriptors: Record<string, { applications?: Array<{ application: string; privileges: string[]; resources: string[] }> }> = {};
 
     const kibanaPrivileges: Array<{
       spaces: string[];

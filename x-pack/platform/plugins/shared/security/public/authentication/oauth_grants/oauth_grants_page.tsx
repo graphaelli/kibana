@@ -8,7 +8,6 @@
 import {
   EuiBasicTable,
   EuiBadge,
-  EuiButton,
   EuiButtonIcon,
   EuiConfirmModal,
   EuiEmptyPrompt,

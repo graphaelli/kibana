@@ -455,7 +455,6 @@ export class SecurityPlugin
       logger: this.initializerContext.logger.get('oauth'),
       clusterClient,
       applicationName: this.authorizationSetup!.applicationName,
-      kibanaFeatures: features.getKibanaFeatures(),
     });
     this.oauthAuthorizationService.start();
 
